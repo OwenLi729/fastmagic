@@ -158,6 +158,18 @@ def read_summary(results_root: Path, run_name: str) -> dict[str, Any]:
         return json.load(handle)
 
 
+# AI-generated: GitHub Copilot, 2026-04-24
+def is_completed_summary(summary: dict[str, Any]) -> bool:
+    """Return True when a run summary is from a fully completed training run."""
+    explicit_complete = summary.get("is_complete")
+    if isinstance(explicit_complete, bool):
+        return explicit_complete
+
+    # Backward-compatible heuristic for older summaries that do not carry
+    # `is_complete`: final summaries include training-time aggregate metrics.
+    return summary.get("avg_wall_clock_per_update_ms") is not None
+
+
 def aggregate_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Aggregate final and best scores across seeds for each environment."""
     grouped: dict[tuple[str, str, str], list[dict[str, Any]]] = {}
@@ -271,17 +283,24 @@ def main() -> None:
                 )
                 summary_path = results_root / run_name / "summary.json"
                 if args.skip_existing and summary_path.exists():
-                    print(
-                        "[benchmark] skipping existing "
-                        f"ablation={spec['ablation_type']} value={spec['ablation_value']} "
-                        f"env={env_name} seed={seed}"
-                    )
                     summary = read_summary(results_root=results_root, run_name=run_name)
-                    summary["ablation_type"] = spec["ablation_type"]
-                    summary["ablation_value"] = spec["ablation_value"]
-                    raw_rows.append(summary)
-                    skipped_runs += 1
-                    continue
+                    if not is_completed_summary(summary):
+                        print(
+                            "[benchmark] rerunning incomplete "
+                            f"ablation={spec['ablation_type']} value={spec['ablation_value']} "
+                            f"env={env_name} seed={seed}"
+                        )
+                    else:
+                        print(
+                            "[benchmark] skipping existing "
+                            f"ablation={spec['ablation_type']} value={spec['ablation_value']} "
+                            f"env={env_name} seed={seed}"
+                        )
+                        summary["ablation_type"] = spec["ablation_type"]
+                        summary["ablation_value"] = spec["ablation_value"]
+                        raw_rows.append(summary)
+                        skipped_runs += 1
+                        continue
                 command = build_train_command(
                     args=args,
                     env_name=env_name,

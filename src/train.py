@@ -473,6 +473,8 @@ def train(args: argparse.Namespace) -> None:
                     "final_d4rl_normalized_score": final_score,
                     "last_eval_step": step,
                     "num_evaluations": len(eval_history),
+                    "train_steps": args.train_steps,
+                    "is_complete": False,
                 },
             )
 
@@ -520,6 +522,7 @@ def train(args: argparse.Namespace) -> None:
         "seed": args.seed,
         "tau": args.tau,
         "beta": args.beta,
+        "train_steps": args.train_steps,
         "n_hidden_layers": args.n_hidden_layers,
         "parallel_vq_updates": args.parallel_vq_updates,
         "torch_compile": args.torch_compile,
@@ -529,6 +532,7 @@ def train(args: argparse.Namespace) -> None:
         "final_d4rl_normalized_score": final_score,
         "last_eval_step": int(eval_history[-1]["step"]) if eval_history else None,
         "num_evaluations": len(eval_history),
+        "is_complete": True,
     }
     if metric_steps > 0:
         summary_payload.update(

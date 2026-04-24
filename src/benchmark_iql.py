@@ -68,6 +68,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--profile", action="store_true")
     parser.add_argument("--deterministic_torch", action="store_true")
     parser.add_argument("--max_envs", type=int, default=None)
+    parser.add_argument(
+        "--skip_existing",
+        action="store_true",
+        help="Skip runs that already have results_root/<run_name>/summary.json.",
+    )
     return parser.parse_args()
 
 
@@ -256,6 +261,7 @@ def main() -> None:
         )
 
     raw_rows: list[dict[str, Any]] = []
+    skipped_runs = 0
     for spec in experiment_specs:
         for env_name in envs:
             for seed in args.seeds:
@@ -263,6 +269,19 @@ def main() -> None:
                     f"{args.preset}_{env_name}_seed{seed}"
                     f"_{spec['ablation_type']}_{spec['ablation_value']}"
                 )
+                summary_path = results_root / run_name / "summary.json"
+                if args.skip_existing and summary_path.exists():
+                    print(
+                        "[benchmark] skipping existing "
+                        f"ablation={spec['ablation_type']} value={spec['ablation_value']} "
+                        f"env={env_name} seed={seed}"
+                    )
+                    summary = read_summary(results_root=results_root, run_name=run_name)
+                    summary["ablation_type"] = spec["ablation_type"]
+                    summary["ablation_value"] = spec["ablation_value"]
+                    raw_rows.append(summary)
+                    skipped_runs += 1
+                    continue
                 command = build_train_command(
                     args=args,
                     env_name=env_name,
@@ -297,6 +316,8 @@ def main() -> None:
 
     print(f"[benchmark] wrote raw runs to {results_root / f'{args.preset}_raw_runs.csv'}")
     print(f"[benchmark] wrote aggregate results to {results_root / f'{args.preset}_aggregate.csv'}")
+    if skipped_runs > 0:
+        print(f"[benchmark] skipped {skipped_runs} existing run(s)")
 
 
 if __name__ == "__main__":

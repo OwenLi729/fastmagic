@@ -61,6 +61,10 @@ def parse_args() -> argparse.Namespace:
         default="default",
     )
     parser.add_argument("--compile_backend", type=str, default=None)
+    parser.add_argument("--parallel_vq_updates", action="store_true")
+    parser.add_argument("--tau_values", nargs="*", type=float, default=None)
+    parser.add_argument("--beta_values", nargs="*", type=float, default=None)
+    parser.add_argument("--n_hidden_layer_values", nargs="*", type=int, default=None)
     parser.add_argument("--profile", action="store_true")
     parser.add_argument("--deterministic_torch", action="store_true")
     parser.add_argument("--max_envs", type=int, default=None)
@@ -75,16 +79,20 @@ def choose_envs(args: argparse.Namespace) -> list[str]:
     return envs
 
 
-def build_train_command(args: argparse.Namespace, env_name: str, seed: int) -> list[str]:
+def build_train_command(
+    args: argparse.Namespace,
+    env_name: str,
+    seed: int,
+    tau: float,
+    beta: float,
+    n_hidden_layers: int,
+    run_name: str,
+) -> list[str]:
     """Construct the subprocess command for one train run."""
     preset = PRESET_CONFIGS[args.preset]
     train_steps = args.train_steps or preset["train_steps"]
     eval_interval = args.eval_interval or preset["eval_interval"]
     eval_episodes = args.eval_episodes or preset["eval_episodes"]
-    tau = preset["tau"]
-    beta = preset["beta"]
-    run_name = f"{args.preset}_{env_name}_seed{seed}"
-
     command = [
         sys.executable,
         "-u",
@@ -110,7 +118,7 @@ def build_train_command(args: argparse.Namespace, env_name: str, seed: int) -> l
         "--hidden_dim",
         str(args.hidden_dim),
         "--n_hidden_layers",
-        str(args.n_hidden_layers),
+        str(n_hidden_layers),
         "--checkpoint_dir",
         args.checkpoint_root,
         "--results_dir",
@@ -129,6 +137,8 @@ def build_train_command(args: argparse.Namespace, env_name: str, seed: int) -> l
         command.extend(["--compile_mode", args.compile_mode])
         if args.compile_backend:
             command.extend(["--compile_backend", args.compile_backend])
+    if args.parallel_vq_updates:
+        command.append("--parallel_vq_updates")
     if args.profile:
         command.append("--profile")
     if args.deterministic_torch:
@@ -136,9 +146,8 @@ def build_train_command(args: argparse.Namespace, env_name: str, seed: int) -> l
     return command
 
 
-def read_summary(results_root: Path, preset: str, env_name: str, seed: int) -> dict[str, Any]:
+def read_summary(results_root: Path, run_name: str) -> dict[str, Any]:
     """Load the summary JSON produced by a single train run."""
-    run_name = f"{preset}_{env_name}_seed{seed}"
     summary_path = results_root / run_name / "summary.json"
     with summary_path.open("r", encoding="utf-8") as handle:
         return json.load(handle)
@@ -146,22 +155,33 @@ def read_summary(results_root: Path, preset: str, env_name: str, seed: int) -> d
 
 def aggregate_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Aggregate final and best scores across seeds for each environment."""
-    grouped: dict[str, list[dict[str, Any]]] = {}
+    grouped: dict[tuple[str, str, str], list[dict[str, Any]]] = {}
     for row in rows:
-        grouped.setdefault(str(row["env"]), []).append(row)
+        key = (str(row["env"]), str(row.get("ablation_type", "default")), str(row.get("ablation_value", "default")))
+        grouped.setdefault(key, []).append(row)
 
     aggregate: list[dict[str, Any]] = []
-    for env_name, env_rows in grouped.items():
+    for (env_name, ablation_type, ablation_value), env_rows in grouped.items():
         final_scores = [float(row["final_d4rl_normalized_score"]) for row in env_rows if row["final_d4rl_normalized_score"] is not None]
         best_scores = [float(row["best_d4rl_normalized_score"]) for row in env_rows if row["best_d4rl_normalized_score"] is not None]
+        avg_update_ms = [float(row["avg_wall_clock_per_update_ms"]) for row in env_rows if row.get("avg_wall_clock_per_update_ms") is not None]
+        avg_replay_sps = [float(row["avg_replay_buffer_throughput"]) for row in env_rows if row.get("avg_replay_buffer_throughput") is not None]
+        avg_ratio = [float(row["avg_critic_actor_update_ratio"]) for row in env_rows if row.get("avg_critic_actor_update_ratio") is not None]
+        avg_inference_ms = [float(row["avg_inference_time_ms"]) for row in env_rows if row.get("avg_inference_time_ms") is not None]
         aggregate.append(
             {
                 "env": env_name,
+                "ablation_type": ablation_type,
+                "ablation_value": ablation_value,
                 "num_seeds": len(env_rows),
                 "final_score_mean": statistics.mean(final_scores) if final_scores else None,
                 "final_score_std": statistics.pstdev(final_scores) if len(final_scores) > 1 else 0.0 if final_scores else None,
                 "best_score_mean": statistics.mean(best_scores) if best_scores else None,
                 "best_score_std": statistics.pstdev(best_scores) if len(best_scores) > 1 else 0.0 if best_scores else None,
+                "avg_wall_clock_per_update_ms": statistics.mean(avg_update_ms) if avg_update_ms else None,
+                "avg_replay_buffer_throughput": statistics.mean(avg_replay_sps) if avg_replay_sps else None,
+                "avg_critic_actor_update_ratio": statistics.mean(avg_ratio) if avg_ratio else None,
+                "avg_inference_time_ms": statistics.mean(avg_inference_ms) if avg_inference_ms else None,
             }
         )
     return aggregate
@@ -187,21 +207,89 @@ def main() -> None:
     results_root = Path(args.results_root)
     results_root.mkdir(parents=True, exist_ok=True)
 
+    preset = PRESET_CONFIGS[args.preset]
+
+    experiment_specs: list[dict[str, Any]] = [
+        {
+            "ablation_type": "default",
+            "ablation_value": "default",
+            "tau": float(preset["tau"]),
+            "beta": float(preset["beta"]),
+            "n_hidden_layers": int(args.n_hidden_layers),
+        }
+    ]
+
+    if args.tau_values:
+        experiment_specs.extend(
+            {
+                "ablation_type": "tau",
+                "ablation_value": str(tau),
+                "tau": float(tau),
+                "beta": float(preset["beta"]),
+                "n_hidden_layers": int(args.n_hidden_layers),
+            }
+            for tau in args.tau_values
+        )
+
+    if args.beta_values:
+        experiment_specs.extend(
+            {
+                "ablation_type": "beta",
+                "ablation_value": str(beta),
+                "tau": float(preset["tau"]),
+                "beta": float(beta),
+                "n_hidden_layers": int(args.n_hidden_layers),
+            }
+            for beta in args.beta_values
+        )
+
+    if args.n_hidden_layer_values:
+        experiment_specs.extend(
+            {
+                "ablation_type": "n_hidden_layers",
+                "ablation_value": str(n_hidden_layers),
+                "tau": float(preset["tau"]),
+                "beta": float(preset["beta"]),
+                "n_hidden_layers": int(n_hidden_layers),
+            }
+            for n_hidden_layers in args.n_hidden_layer_values
+        )
+
     raw_rows: list[dict[str, Any]] = []
-    for env_name in envs:
-        for seed in args.seeds:
-            command = build_train_command(args=args, env_name=env_name, seed=seed)
-            print(f"[benchmark] running env={env_name} seed={seed}")
-            run_result = subprocess.run(command, check=False, capture_output=True, text=True)
-            if run_result.stdout:
-                print(run_result.stdout, end="")
-            if run_result.returncode != 0:
-                print(f"[benchmark] failed env={env_name} seed={seed} exit={run_result.returncode}")
-                if run_result.stderr:
-                    print("[benchmark] child stderr:")
-                    print(run_result.stderr, end="")
-                raise RuntimeError(f"train failed for env={env_name} seed={seed} with exit code {run_result.returncode}")
-            raw_rows.append(read_summary(results_root=results_root, preset=args.preset, env_name=env_name, seed=seed))
+    for spec in experiment_specs:
+        for env_name in envs:
+            for seed in args.seeds:
+                run_name = (
+                    f"{args.preset}_{env_name}_seed{seed}"
+                    f"_{spec['ablation_type']}_{spec['ablation_value']}"
+                )
+                command = build_train_command(
+                    args=args,
+                    env_name=env_name,
+                    seed=seed,
+                    tau=float(spec["tau"]),
+                    beta=float(spec["beta"]),
+                    n_hidden_layers=int(spec["n_hidden_layers"]),
+                    run_name=run_name,
+                )
+                print(
+                    "[benchmark] running "
+                    f"ablation={spec['ablation_type']} value={spec['ablation_value']} "
+                    f"env={env_name} seed={seed}"
+                )
+                run_result = subprocess.run(command, check=False, capture_output=True, text=True)
+                if run_result.stdout:
+                    print(run_result.stdout, end="")
+                if run_result.returncode != 0:
+                    print(f"[benchmark] failed env={env_name} seed={seed} exit={run_result.returncode}")
+                    if run_result.stderr:
+                        print("[benchmark] child stderr:")
+                        print(run_result.stderr, end="")
+                    raise RuntimeError(f"train failed for env={env_name} seed={seed} with exit code {run_result.returncode}")
+                summary = read_summary(results_root=results_root, run_name=run_name)
+                summary["ablation_type"] = spec["ablation_type"]
+                summary["ablation_value"] = spec["ablation_value"]
+                raw_rows.append(summary)
 
     aggregate_rows_data = aggregate_rows(raw_rows)
     write_csv(results_root / f"{args.preset}_raw_runs.csv", raw_rows)

@@ -116,6 +116,11 @@ def parse_args() -> argparse.Namespace:
         default=None,
         help="Optional torch.compile backend override (for example: inductor).",
     )
+    parser.add_argument(
+        "--parallel_vq_updates",
+        action="store_true",
+        help="Update value and Q critics in a single combined backward/step phase.",
+    )
     parser.add_argument("--profile", action="store_true")
     parser.add_argument("--deterministic_torch", action="store_true")
     parser.add_argument("--use_wandb", action="store_true")
@@ -355,7 +360,9 @@ def train(args: argparse.Namespace) -> None:
     total_inference_ms = 0.0
     total_critic_ms = 0.0
     total_actor_ms = 0.0
-    profiled_steps = 0
+    total_replay_throughput = 0.0
+    total_critic_actor_ratio = 0.0
+    metric_steps = 0
     best_score = float("-inf")
     final_score: float | None = None
     eval_history: list[dict[str, float | int]] = []
@@ -385,10 +392,6 @@ def train(args: argparse.Namespace) -> None:
 
         q1_optimizer.zero_grad(set_to_none=True)
         q2_optimizer.zero_grad(set_to_none=True)
-        (losses["q1_loss"] + losses["q2_loss"]).backward()
-        q1_optimizer.step()
-        q2_optimizer.step()
-
         value_optimizer.zero_grad(set_to_none=True)
         value_loss_for_backward = losses["value_loss"]
         if not value_loss_for_backward.requires_grad:
@@ -399,8 +402,18 @@ def train(args: argparse.Namespace) -> None:
                 value_loss_for_backward = expectile_loss(q_dataset - v_pred, tau=args.tau)
             losses["value_loss"] = value_loss_for_backward.detach()
             print("[warning] value_loss was detached; recomputed value loss in fresh graph.")
-        value_loss_for_backward.backward()
-        value_optimizer.step()
+
+        if args.parallel_vq_updates:
+            (losses["q1_loss"] + losses["q2_loss"] + value_loss_for_backward).backward()
+            q1_optimizer.step()
+            q2_optimizer.step()
+            value_optimizer.step()
+        else:
+            (losses["q1_loss"] + losses["q2_loss"]).backward()
+            q1_optimizer.step()
+            q2_optimizer.step()
+            value_loss_for_backward.backward()
+            value_optimizer.step()
         critic_ms = critic_timer.stop()
 
         actor_timer.start()
@@ -489,12 +502,13 @@ def train(args: argparse.Namespace) -> None:
                 f"replay_sps={metrics['replay_buffer_throughput']:.1f}"
             )
 
-        if args.profile:
-            total_update_ms += wall_clock_per_update_ms
-            total_inference_ms += inference_time_ms
-            total_critic_ms += critic_ms
-            total_actor_ms += actor_ms
-            profiled_steps += 1
+        total_update_ms += wall_clock_per_update_ms
+        total_inference_ms += inference_time_ms
+        total_critic_ms += critic_ms
+        total_actor_ms += actor_ms
+        total_replay_throughput += replay_throughput
+        total_critic_actor_ratio += critic_actor_update_ratio
+        metric_steps += 1
 
         if step % args.checkpoint_interval == 0:
             save_checkpoint(
@@ -515,30 +529,47 @@ def train(args: argparse.Namespace) -> None:
                 config=vars(args),
             )
 
-    if final_score is None:
-        save_json(
-            results_dir / "summary.json",
+    summary_payload: dict[str, Any] = {
+        "run_name": run_name,
+        "env": args.env,
+        "seed": args.seed,
+        "tau": args.tau,
+        "beta": args.beta,
+        "n_hidden_layers": args.n_hidden_layers,
+        "parallel_vq_updates": args.parallel_vq_updates,
+        "torch_compile": args.torch_compile,
+        "compile_mode": args.compile_mode,
+        "compile_backend": args.compile_backend,
+        "best_d4rl_normalized_score": best_score if best_score != float("-inf") else None,
+        "final_d4rl_normalized_score": final_score,
+        "last_eval_step": int(eval_history[-1]["step"]) if eval_history else None,
+        "num_evaluations": len(eval_history),
+    }
+    if metric_steps > 0:
+        summary_payload.update(
             {
-                "run_name": run_name,
-                "env": args.env,
-                "seed": args.seed,
-                "best_d4rl_normalized_score": None,
-                "final_d4rl_normalized_score": None,
-                "last_eval_step": None,
-                "num_evaluations": 0,
-            },
+                "avg_wall_clock_per_update_ms": total_update_ms / metric_steps,
+                "avg_replay_buffer_throughput": total_replay_throughput / metric_steps,
+                "avg_critic_actor_update_ratio": total_critic_actor_ratio / metric_steps,
+                "avg_inference_time_ms": total_inference_ms / metric_steps,
+                "avg_critic_ms": total_critic_ms / metric_steps,
+                "avg_actor_ms": total_actor_ms / metric_steps,
+            }
         )
+    save_json(results_dir / "summary.json", summary_payload)
 
     if args.use_wandb:
         wandb.finish()
 
-    if args.profile and profiled_steps > 0:
+    if args.profile and metric_steps > 0:
         print(
             "[profile] "
-            f"avg_update_ms={total_update_ms / profiled_steps:.4f} "
-            f"avg_critic_ms={total_critic_ms / profiled_steps:.4f} "
-            f"avg_actor_ms={total_actor_ms / profiled_steps:.4f} "
-            f"avg_inference_ms={total_inference_ms / profiled_steps:.4f}"
+            f"avg_update_ms={total_update_ms / metric_steps:.4f} "
+            f"avg_critic_ms={total_critic_ms / metric_steps:.4f} "
+            f"avg_actor_ms={total_actor_ms / metric_steps:.4f} "
+            f"avg_inference_ms={total_inference_ms / metric_steps:.4f} "
+            f"avg_replay_sps={total_replay_throughput / metric_steps:.1f} "
+            f"avg_critic_actor_ratio={total_critic_actor_ratio / metric_steps:.4f}"
         )
 
 

@@ -79,6 +79,9 @@ def build_train_command(args: argparse.Namespace, env_name: str, seed: int) -> l
 
     command = [
         sys.executable,
+        "-u",
+        "-X",
+        "faulthandler",
         "src/train.py",
         "--env",
         env_name,

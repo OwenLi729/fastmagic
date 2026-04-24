@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import traceback
 from contextlib import nullcontext
 from pathlib import Path
 from typing import Any
@@ -259,7 +260,19 @@ def train(args: argparse.Namespace) -> None:
         f"mixed_precision={mixed_precision_enabled} baseline={baseline_mode}"
     )
 
-    replay = GPUReplayBuffer(env_name=args.env, device=device, storage_device=replay_device)
+    replay_storage_device = replay_device
+    try:
+        replay = GPUReplayBuffer(env_name=args.env, device=device, storage_device=replay_storage_device)
+    except RuntimeError as replay_error:
+        if replay_storage_device.type == "cuda" and not baseline_mode:
+            print(
+                "[warning] failed to initialize replay on CUDA; falling back to CPU replay. "
+                f"Original error: {replay_error}"
+            )
+            replay_storage_device = torch.device("cpu")
+            replay = GPUReplayBuffer(env_name=args.env, device=device, storage_device=replay_storage_device)
+        else:
+            raise
     value_net, q_net, target_q_net, policy = build_models(
         replay=replay,
         hidden_dim=args.hidden_dim,
@@ -467,7 +480,12 @@ def train(args: argparse.Namespace) -> None:
 def main() -> None:
     """CLI entry point."""
     args = parse_args()
-    train(args)
+    try:
+        train(args)
+    except Exception:
+        print("[fatal] training failed with traceback:")
+        print(traceback.format_exc())
+        raise
 
 
 if __name__ == "__main__":

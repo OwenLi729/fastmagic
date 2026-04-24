@@ -345,18 +345,43 @@ def train(args: argparse.Namespace) -> None:
 
         q1_optimizer.zero_grad(set_to_none=True)
         q2_optimizer.zero_grad(set_to_none=True)
-        (losses["q1_loss"] + losses["q2_loss"]).backward(retain_graph=True)
+        (losses["q1_loss"] + losses["q2_loss"]).backward()
         q1_optimizer.step()
         q2_optimizer.step()
 
         value_optimizer.zero_grad(set_to_none=True)
-        losses["value_loss"].backward()
+        value_loss_for_backward = losses["value_loss"]
+        if not value_loss_for_backward.requires_grad:
+            with autocast_ctx():
+                with torch.no_grad():
+                    q_dataset = target_q_net.min_q(batch.observations, batch.actions)
+                v_pred = value_net(batch.observations)
+                value_loss_for_backward = expectile_loss(q_dataset - v_pred, tau=args.tau)
+            losses["value_loss"] = value_loss_for_backward.detach()
+            print("[warning] value_loss was detached; recomputed value loss in fresh graph.")
+        value_loss_for_backward.backward()
         value_optimizer.step()
         critic_ms = critic_timer.stop()
 
         actor_timer.start()
         policy_optimizer.zero_grad(set_to_none=True)
-        losses["policy_loss"].backward()
+        policy_loss_for_backward = losses["policy_loss"]
+        if not policy_loss_for_backward.requires_grad:
+            with autocast_ctx():
+                with torch.no_grad():
+                    q_dataset = target_q_net.min_q(batch.observations, batch.actions)
+                    v_pred = value_net(batch.observations)
+                    advantages = q_dataset - v_pred
+                log_prob = policy.log_prob(batch.observations, batch.actions)
+                policy_loss_for_backward = awr_policy_loss(
+                    advantages=advantages,
+                    log_prob=log_prob,
+                    beta=args.beta,
+                    max_weight=args.clip_score,
+                )
+            losses["policy_loss"] = policy_loss_for_backward.detach()
+            print("[warning] policy_loss was detached; recomputed policy loss in fresh graph.")
+        policy_loss_for_backward.backward()
         policy_optimizer.step()
         actor_ms = actor_timer.stop()
 

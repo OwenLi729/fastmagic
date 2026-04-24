@@ -176,7 +176,15 @@ def main() -> None:
         for seed in args.seeds:
             command = build_train_command(args=args, env_name=env_name, seed=seed)
             print(f"[benchmark] running env={env_name} seed={seed}")
-            subprocess.run(command, check=True)
+            run_result = subprocess.run(command, check=False, capture_output=True, text=True)
+            if run_result.stdout:
+                print(run_result.stdout, end="")
+            if run_result.returncode != 0:
+                print(f"[benchmark] failed env={env_name} seed={seed} exit={run_result.returncode}")
+                if run_result.stderr:
+                    print("[benchmark] child stderr:")
+                    print(run_result.stderr, end="")
+                raise RuntimeError(f"train failed for env={env_name} seed={seed} with exit code {run_result.returncode}")
             raw_rows.append(read_summary(results_root=results_root, preset=args.preset, env_name=env_name, seed=seed))
 
     aggregate_rows_data = aggregate_rows(raw_rows)

@@ -98,6 +98,24 @@ def parse_args() -> argparse.Namespace:
         help="Where replay tensors are stored. auto=gpu when CUDA available, else cpu.",
     )
     parser.add_argument("--mixed_precision", action="store_true")
+    parser.add_argument(
+        "--torch_compile",
+        action="store_true",
+        help="Enable torch.compile for forward modules (value, Q, policy).",
+    )
+    parser.add_argument(
+        "--compile_mode",
+        type=str,
+        choices=("default", "reduce-overhead", "max-autotune"),
+        default="default",
+        help="Compilation mode passed to torch.compile.",
+    )
+    parser.add_argument(
+        "--compile_backend",
+        type=str,
+        default=None,
+        help="Optional torch.compile backend override (for example: inductor).",
+    )
     parser.add_argument("--profile", action="store_true")
     parser.add_argument("--deterministic_torch", action="store_true")
     parser.add_argument("--use_wandb", action="store_true")
@@ -288,6 +306,28 @@ def train(args: argparse.Namespace) -> None:
         weight_decay=args.weight_decay,
     )
 
+    forward_value_net = value_net
+    forward_q_net = q_net
+    forward_policy = policy
+    if args.torch_compile:
+        if not hasattr(torch, "compile"):
+            print("[warning] torch.compile is unavailable in this PyTorch build; using eager mode.")
+        else:
+            compile_kwargs: dict[str, Any] = {"mode": args.compile_mode}
+            if args.compile_backend:
+                compile_kwargs["backend"] = args.compile_backend
+            try:
+                forward_value_net = torch.compile(value_net, **compile_kwargs)
+                forward_q_net = torch.compile(q_net, **compile_kwargs)
+                forward_policy = torch.compile(policy, **compile_kwargs)
+                backend_name = args.compile_backend or "default"
+                print(f"[config] torch.compile enabled mode={args.compile_mode} backend={backend_name}")
+            except Exception as compile_error:
+                print(f"[warning] torch.compile setup failed; using eager mode. Original error: {compile_error}")
+                forward_value_net = value_net
+                forward_q_net = q_net
+                forward_policy = policy
+
     if args.use_wandb:
         if wandb is None:
             raise ModuleNotFoundError("wandb is not installed. Install it or run without --use_wandb.")
@@ -332,10 +372,10 @@ def train(args: argparse.Namespace) -> None:
         with autocast_ctx():
             losses = compute_iql_losses(
                 batch=batch,
-                value_net=value_net,
-                q_net=q_net,
+                value_net=forward_value_net,
+                q_net=forward_q_net,
                 target_q_net=target_q_net,
-                policy=policy,
+                policy=forward_policy,
                 discount=args.discount,
                 reward_scale=args.reward_scale,
                 tau=args.tau,
@@ -355,7 +395,7 @@ def train(args: argparse.Namespace) -> None:
             with autocast_ctx():
                 with torch.no_grad():
                     q_dataset = target_q_net.min_q(batch.observations, batch.actions)
-                v_pred = value_net(batch.observations)
+                v_pred = forward_value_net(batch.observations)
                 value_loss_for_backward = expectile_loss(q_dataset - v_pred, tau=args.tau)
             losses["value_loss"] = value_loss_for_backward.detach()
             print("[warning] value_loss was detached; recomputed value loss in fresh graph.")
@@ -370,9 +410,9 @@ def train(args: argparse.Namespace) -> None:
             with autocast_ctx():
                 with torch.no_grad():
                     q_dataset = target_q_net.min_q(batch.observations, batch.actions)
-                    v_pred = value_net(batch.observations)
+                    v_pred = forward_value_net(batch.observations)
                     advantages = q_dataset - v_pred
-                log_prob = policy.log_prob(batch.observations, batch.actions)
+                log_prob = forward_policy.log_prob(batch.observations, batch.actions)
                 policy_loss_for_backward = awr_policy_loss(
                     advantages=advantages,
                     log_prob=log_prob,
@@ -393,7 +433,7 @@ def train(args: argparse.Namespace) -> None:
 
         inference_timer = CudaEventTimer(enabled=(device.type == "cuda"))
         inference_timer.start()
-        _ = policy.act(batch.observations[:1], deterministic=True)
+        _ = forward_policy.act(batch.observations[:1], deterministic=True)
         inference_time_ms = inference_timer.stop()
 
         critic_actor_update_ratio = critic_ms / max(actor_ms, 1e-8) if actor_ms > 0.0 else 0.0
@@ -413,7 +453,7 @@ def train(args: argparse.Namespace) -> None:
 
         if step % args.eval_interval == 0:
             metrics["d4rl_normalized_score"] = evaluate_policy(
-                policy=policy,
+                policy=forward_policy,
                 env_name=args.env,
                 device=device,
                 n_episodes=args.eval_episodes,

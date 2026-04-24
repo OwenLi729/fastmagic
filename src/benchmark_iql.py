@@ -53,6 +53,14 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--baseline", action="store_true")
     parser.add_argument("--replay_device", type=str, choices=("auto", "cpu", "gpu"), default="auto")
     parser.add_argument("--mixed_precision", action="store_true")
+    parser.add_argument("--torch_compile", action="store_true")
+    parser.add_argument(
+        "--compile_mode",
+        type=str,
+        choices=("default", "reduce-overhead", "max-autotune"),
+        default="default",
+    )
+    parser.add_argument("--compile_backend", type=str, default=None)
     parser.add_argument("--profile", action="store_true")
     parser.add_argument("--deterministic_torch", action="store_true")
     parser.add_argument("--max_envs", type=int, default=None)
@@ -116,6 +124,11 @@ def build_train_command(args: argparse.Namespace, env_name: str, seed: int) -> l
         command.append("--baseline")
     if args.mixed_precision:
         command.append("--mixed_precision")
+    if args.torch_compile:
+        command.append("--torch_compile")
+        command.extend(["--compile_mode", args.compile_mode])
+        if args.compile_backend:
+            command.extend(["--compile_backend", args.compile_backend])
     if args.profile:
         command.append("--profile")
     if args.deterministic_torch:

@@ -2,3 +2,4 @@ agents.md
 context/
 .venv/
 setup.md
+__pycache__/

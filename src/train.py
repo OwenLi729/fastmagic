@@ -13,11 +13,13 @@ from typing import Any
 
 import torch
 import torch.nn.functional as F
-import wandb
 from tqdm import trange
 
-from buffer import GPUReplayBuffer, ReplayBatch
-from evaluate import evaluate_policy
+try:
+    import wandb
+except ModuleNotFoundError:  # pragma: no cover - optional dependency in minimal environments.
+    wandb = None
+
 from losses import awr_policy_loss, awr_weights, expectile_loss
 from networks import GaussianPolicy, TwinQNetwork, ValueNetwork
 from utils import CudaEventTimer, save_checkpoint, set_seed
@@ -82,6 +84,18 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--checkpoint_dir", type=str, default="models")
     parser.add_argument("--results_dir", type=str, default="results")
     parser.add_argument("--run_name", type=str, default=None)
+    parser.add_argument(
+        "--baseline",
+        action="store_true",
+        help="Run standard baseline config: disables mixed precision and keeps replay data on CPU.",
+    )
+    parser.add_argument(
+        "--replay_device",
+        type=str,
+        choices=("auto", "cpu", "gpu"),
+        default="auto",
+        help="Where replay tensors are stored. auto=gpu when CUDA available, else cpu.",
+    )
     parser.add_argument("--mixed_precision", action="store_true")
     parser.add_argument("--profile", action="store_true")
     parser.add_argument("--deterministic_torch", action="store_true")
@@ -217,10 +231,35 @@ def compute_iql_losses(
 
 def train(args: argparse.Namespace) -> None:
     """Train IQL on an offline D4RL dataset."""
+    from buffer import GPUReplayBuffer
+    from evaluate import evaluate_policy
+
     set_seed(args.seed, deterministic=args.deterministic_torch)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    baseline_mode = args.baseline
 
-    replay = GPUReplayBuffer(env_name=args.env, device=device)
+    if args.replay_device == "gpu" and device.type != "cuda":
+        raise ValueError("--replay_device gpu requires CUDA.")
+
+    if baseline_mode:
+        replay_device = torch.device("cpu")
+        mixed_precision_enabled = False
+    elif args.replay_device == "auto":
+        replay_device = torch.device("cuda" if device.type == "cuda" else "cpu")
+        mixed_precision_enabled = args.mixed_precision and device.type == "cuda"
+    elif args.replay_device == "gpu":
+        replay_device = torch.device("cuda")
+        mixed_precision_enabled = args.mixed_precision and device.type == "cuda"
+    else:
+        replay_device = torch.device("cpu")
+        mixed_precision_enabled = args.mixed_precision and device.type == "cuda"
+
+    print(
+        f"[config] train_device={device.type} replay_device={replay_device.type} "
+        f"mixed_precision={mixed_precision_enabled} baseline={baseline_mode}"
+    )
+
+    replay = GPUReplayBuffer(env_name=args.env, device=device, storage_device=replay_device)
     value_net, q_net, target_q_net, policy = build_models(
         replay=replay,
         hidden_dim=args.hidden_dim,
@@ -237,6 +276,8 @@ def train(args: argparse.Namespace) -> None:
     )
 
     if args.use_wandb:
+        if wandb is None:
+            raise ModuleNotFoundError("wandb is not installed. Install it or run without --use_wandb.")
         wandb.init(project=args.wandb_project, config=vars(args))
 
     checkpoint_dir, results_dir, run_name = build_run_directories(args)
@@ -244,7 +285,7 @@ def train(args: argparse.Namespace) -> None:
 
     autocast_ctx = (
         (lambda: torch.autocast(device_type="cuda", dtype=torch.bfloat16))
-        if args.mixed_precision and device.type == "cuda"
+        if mixed_precision_enabled and device.type == "cuda"
         else (lambda: nullcontext())
     )
 

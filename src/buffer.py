@@ -6,9 +6,8 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import time
 
-import d4rl
-import gym
 import numpy as np
 import torch
 from torch import Tensor
@@ -24,14 +23,21 @@ class ReplayBatch:
     next_observations: Tensor
     terminals: Tensor
 
-
-# AI-generated: Claude, 2026-04-21
 class GPUReplayBuffer:
     """Replay buffer that stores full D4RL dataset as tensors on a target device."""
 
-    def __init__(self, env_name: str, device: torch.device) -> None:
+    def __init__(
+        self,
+        env_name: str,
+        device: torch.device,
+        storage_device: torch.device | None = None,
+    ) -> None:
+        import d4rl  # pylint: disable=import-outside-toplevel
+        import gym  # pylint: disable=import-outside-toplevel
+
         self.env_name = env_name
         self.device = device
+        self.storage_device = storage_device if storage_device is not None else device
 
         env = gym.make(env_name)
         dataset = d4rl.qlearning_dataset(env)
@@ -83,26 +89,49 @@ class GPUReplayBuffer:
         return rewards / reward_range * 1000.0
 
     def _to_tensor(self, array: np.ndarray) -> Tensor:
-        return torch.as_tensor(array, dtype=torch.float32, device=self.device)
+        return torch.as_tensor(array, dtype=torch.float32, device=self.storage_device)
+
+    def _batch_to_training_device(self, batch: ReplayBatch) -> ReplayBatch:
+        if self.storage_device == self.device:
+            return batch
+        return ReplayBatch(
+            observations=batch.observations.to(self.device, non_blocking=True),
+            actions=batch.actions.to(self.device, non_blocking=True),
+            rewards=batch.rewards.to(self.device, non_blocking=True),
+            next_observations=batch.next_observations.to(self.device, non_blocking=True),
+            terminals=batch.terminals.to(self.device, non_blocking=True),
+        )
 
     def sample(self, batch_size: int) -> ReplayBatch:
         if batch_size <= 0:
             raise ValueError(f"batch_size must be positive, got {batch_size}")
 
-        indices = torch.randint(0, self.size, (batch_size,), device=self.device)
-        return ReplayBatch(
+        indices = torch.randint(0, self.size, (batch_size,), device=self.storage_device)
+        batch = ReplayBatch(
             observations=self.observations[indices],
             actions=self.actions[indices],
             rewards=self.rewards[indices],
             next_observations=self.next_observations[indices],
             terminals=self.terminals[indices],
         )
+        return self._batch_to_training_device(batch)
 
     def sample_with_throughput(self, batch_size: int) -> tuple[ReplayBatch, float]:
         """Sample a batch and report throughput in samples/sec (CUDA timing)."""
         if self.device.type != "cuda":
+            start = time.perf_counter()
             batch = self.sample(batch_size)
-            return batch, 0.0
+            elapsed = time.perf_counter() - start
+            throughput = float(batch_size / max(elapsed, 1e-8))
+            return batch, throughput
+
+        if self.storage_device.type != "cuda":
+            start = time.perf_counter()
+            batch = self.sample(batch_size)
+            torch.cuda.synchronize()
+            elapsed = time.perf_counter() - start
+            throughput = float(batch_size / max(elapsed, 1e-8))
+            return batch, throughput
 
         start = torch.cuda.Event(enable_timing=True)
         end = torch.cuda.Event(enable_timing=True)

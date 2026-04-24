@@ -1,4 +1,4 @@
-<!-- AI-generated: Claude, 2026-04-21 -->
+<!-- AI-assisted: Claude, 2026-04-21 -->
 
 # Fastmagic
 
@@ -8,10 +8,10 @@
 
 ## What it Does
 
-Fastmagic is an offline reinforcement learning project that reimplements IQL in PyTorch and benchmarks performance-oriented training features for Google Colab T4 GPUs. It includes:
+Fastmagic is an offline reinforcement learning project for COMPSCI 372, taught by Dr. Brandon Fain. It reimplements the Implicit Q-Learning Paper (Kostrikov) in PyTorch and tests and measures speed improvements on a Google Colab T4 GPU. It includes:
 
-- IQL core components: value network, twin Q-networks, and Gaussian policy
-- Vectorized IQL losses (expectile regression + AWR policy objective)
+- IQL core components
+- Vectorized IQL losses 
 - GPU-resident replay buffer from D4RL data
 - BF16 mixed precision update path using `torch.autocast('cuda', dtype=torch.bfloat16)`
 - CUDA-event-based timing for wall-clock training and inference metrics
@@ -31,6 +31,17 @@ Fastmagic is an offline reinforcement learning project that reimplements IQL in 
 	python src/train.py --env hopper-medium-v2 --tau 0.7 --beta 3.0 --mixed_precision --profile
 	```
 4. Colab workflow: use [notebooks/colab_train.ipynb](notebooks/colab_train.ipynb)
+
+### Baseline Comparison Runs (T4)
+
+- Standard IQL baseline (no optimization targets):
+	```bash
+	python src/train.py --env hopper-medium-v2 --seed 0 --train_steps 100000 --profile --baseline
+	```
+- Improved path (mixed precision + GPU replay storage):
+	```bash
+	python src/train.py --env hopper-medium-v2 --seed 0 --train_steps 100000 --profile --mixed_precision --replay_device gpu
+	```
 
 ## Video Links
 
@@ -60,35 +71,9 @@ Training logs include:
 - `beta ∈ {1.0, 3.0, 10.0}`
 - Value network depth: 1 vs 2 vs 3 hidden layers
 
-## Individual Contributions
+## Contributors
 
-- Member 1: **TBD**
-- Member 2: **TBD**
-- Member 3: **TBD**
-
-## Repository Layout
-
-```text
-fastmagic/
-├── src/
-│   ├── networks.py
-│   ├── losses.py
-│   ├── buffer.py
-│   ├── train.py
-│   ├── evaluate.py
-│   └── utils.py
-├── data/
-│   └── download_d4rl.py
-├── models/
-├── notebooks/
-│   └── colab_train.ipynb
-├── docs/
-├── videos/
-├── context/
-├── requirements.txt
-├── SETUP.md
-└── ATTRIBUTION.md
-```
+- Owen Li
 
 ## Attribution Note
 

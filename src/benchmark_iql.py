@@ -50,6 +50,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--n_hidden_layers", type=int, default=2)
     parser.add_argument("--checkpoint_root", type=str, default="models/benchmarks")
     parser.add_argument("--results_root", type=str, default="results/benchmarks")
+    parser.add_argument("--baseline", action="store_true")
+    parser.add_argument("--replay_device", type=str, choices=("auto", "cpu", "gpu"), default="auto")
     parser.add_argument("--mixed_precision", action="store_true")
     parser.add_argument("--profile", action="store_true")
     parser.add_argument("--deterministic_torch", action="store_true")
@@ -104,7 +106,11 @@ def build_train_command(args: argparse.Namespace, env_name: str, seed: int) -> l
         args.results_root,
         "--run_name",
         run_name,
+        "--replay_device",
+        args.replay_device,
     ]
+    if args.baseline:
+        command.append("--baseline")
     if args.mixed_precision:
         command.append("--mixed_precision")
     if args.profile:

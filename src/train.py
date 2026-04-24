@@ -283,9 +283,18 @@ def train(args: argparse.Namespace) -> None:
     checkpoint_dir, results_dir, run_name = build_run_directories(args)
     save_json(results_dir / "config.json", dict(vars(args), run_name=run_name))
 
+    amp_dtype: torch.dtype | None = None
+    if mixed_precision_enabled and device.type == "cuda":
+        if torch.cuda.is_bf16_supported():
+            amp_dtype = torch.bfloat16
+            print("[config] mixed precision dtype=bf16")
+        else:
+            amp_dtype = torch.float16
+            print("[config] mixed precision dtype=fp16 (bf16 unsupported on this GPU)")
+
     autocast_ctx = (
-        (lambda: torch.autocast(device_type="cuda", dtype=torch.bfloat16))
-        if mixed_precision_enabled and device.type == "cuda"
+        (lambda: torch.autocast(device_type="cuda", dtype=amp_dtype))
+        if amp_dtype is not None
         else (lambda: nullcontext())
     )
 

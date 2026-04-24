@@ -13,7 +13,6 @@ import torch
 import torch.nn as nn
 
 
-# AI-generated: Claude, 2026-04-21
 class CudaEventTimer:
     """Simple CUDA event timer for accurate GPU timing in milliseconds."""
 
@@ -34,7 +33,6 @@ class CudaEventTimer:
         return float(self._start.elapsed_time(self._end))
 
 
-# AI-generated: Claude, 2026-04-23
 def set_seed(seed: int, deterministic: bool = False) -> None:
     """Seed Python, NumPy, and PyTorch for reproducible experiments."""
     random.seed(seed)
@@ -48,7 +46,6 @@ def set_seed(seed: int, deterministic: bool = False) -> None:
         torch.backends.cudnn.benchmark = False
 
 
-# AI-generated: Claude, 2026-04-21
 def save_checkpoint(
     checkpoint_path: str | Path,
     step: int,
@@ -74,7 +71,6 @@ def save_checkpoint(
         json.dump(config, handle, indent=2, sort_keys=True)
 
 
-# AI-generated: Claude, 2026-04-21
 def load_checkpoint(
     checkpoint_path: str | Path,
     models: dict[str, nn.Module],

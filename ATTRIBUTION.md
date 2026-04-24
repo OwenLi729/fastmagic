@@ -28,7 +28,6 @@ This file tracks AI-assisted and external resources used in the Fastmagic course
 - Gym (`gym`)
 - D4RL (`d4rl`)
 - NumPy (`numpy`)
-- Weights & Biases (`wandb`) used?
 - tqdm (`tqdm`) used?
 
 ## Datasets

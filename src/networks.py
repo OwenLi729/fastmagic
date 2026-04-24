@@ -81,7 +81,6 @@ def _initialize_last_layer(linear: nn.Linear, init_w: float = 1e-3) -> None:
     linear.bias.data.uniform_(-init_w, init_w)
 
 
-# AI-generated: Claude, 2026-04-21
 class ValueNetwork(nn.Module):
     """State-value function V(s)."""
 
@@ -98,7 +97,6 @@ class ValueNetwork(nn.Module):
         return self.net(states)
 
 
-# AI-generated: Claude, 2026-04-21
 class QNetwork(nn.Module):
     """Action-value function Q(s, a)."""
 
@@ -115,7 +113,6 @@ class QNetwork(nn.Module):
         return self.net(torch.cat([states, actions], dim=-1))
 
 
-# AI-generated: Claude, 2026-04-21
 class TwinQNetwork(nn.Module):
     """Twin critics for clipped double-Q training."""
 
@@ -132,7 +129,6 @@ class TwinQNetwork(nn.Module):
         return torch.minimum(q1, q2)
 
 
-# AI-generated: Claude, 2026-04-21
 class GaussianPolicy(nn.Module):
     """Gaussian actor used for IQL advantage-weighted regression."""
 

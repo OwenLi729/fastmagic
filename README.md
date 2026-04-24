@@ -8,7 +8,7 @@
 
 ## What it Does
 
-Fastmagic is an offline reinforcement learning project for COMPSCI 372, taught by Dr. Brandon Fain. It reimplements the Implicit Q-Learning Paper (Kostrikov) in PyTorch and tests and measures speed improvements on a Google Colab T4 GPU. It includes:
+Fastmagic is an offline reinforcement learning project for COMPSCI 372, taught by Dr. Brandon Fain. It reimplements the Implicit Q-Learning Paper (Kostrikov) in PyTorch and tests and measures speed improvements on an H200 GPU. Note that the GPUs are not mine and so I had very limited access to any sort of compute throughout this project, which is why I was unable to fully replicate/improve upon all of the results of the paper. It includes:
 
 - IQL core components
 - Vectorized IQL losses 

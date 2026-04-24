@@ -16,11 +16,6 @@ import torch
 import torch.nn.functional as F
 from tqdm import trange
 
-try:
-    import wandb
-except ModuleNotFoundError:  # pragma: no cover - optional dependency in minimal environments.
-    wandb = None
-
 from losses import awr_policy_loss, awr_weights, expectile_loss
 from networks import GaussianPolicy, TwinQNetwork, ValueNetwork
 from utils import CudaEventTimer, save_checkpoint, set_seed
@@ -123,8 +118,6 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--profile", action="store_true")
     parser.add_argument("--deterministic_torch", action="store_true")
-    parser.add_argument("--use_wandb", action="store_true")
-    parser.add_argument("--wandb_project", type=str, default="fastmagic-iql")
     return parser.parse_args()
 
 
@@ -333,11 +326,6 @@ def train(args: argparse.Namespace) -> None:
                 forward_q_net = q_net
                 forward_policy = policy
 
-    if args.use_wandb:
-        if wandb is None:
-            raise ModuleNotFoundError("wandb is not installed. Install it or run without --use_wandb.")
-        wandb.init(project=args.wandb_project, config=vars(args))
-
     checkpoint_dir, results_dir, run_name = build_run_directories(args)
     save_json(results_dir / "config.json", dict(vars(args), run_name=run_name))
 
@@ -488,9 +476,6 @@ def train(args: argparse.Namespace) -> None:
                 },
             )
 
-        if args.use_wandb:
-            wandb.log(metrics, step=step)
-
         if step % args.log_interval == 0:
             print(
                 f"step={step} "
@@ -557,9 +542,6 @@ def train(args: argparse.Namespace) -> None:
             }
         )
     save_json(results_dir / "summary.json", summary_payload)
-
-    if args.use_wandb:
-        wandb.finish()
 
     if args.profile and metric_steps > 0:
         print(

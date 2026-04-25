@@ -36,13 +36,10 @@ export FASTMAGIC_PY=$(which python)
 # ---------------------------------------------------------------------------
 # 2. Paths
 # ---------------------------------------------------------------------------
-# training_script.py lives in storage/owen/ (not inside the repo).
-# It resolves repo_root as $FASTMAGIC_WORK_DIR/fastmagic, so WORK_DIR
-# must be the *parent* of the repo — i.e. $HOME where ~/fastmagic lives.
 export FASTMAGIC_WORK_DIR="${HOME}"
 export FASTMAGIC_REPO="${HOME}/fastmagic"
 export FASTMAGIC_RESULTS="${HOME}/fastmagic_results"
-TRAINING_SCRIPT="/hpc/home/gp163/storage/owen/training_script.py"
+TRAINING_SCRIPT="${FASTMAGIC_REPO}/notebooks/training_script.py"
 # ---------------------------------------------------------------------------
 # 3. MuJoCo environment variables
 # ---------------------------------------------------------------------------
@@ -104,6 +101,11 @@ cd "${FASTMAGIC_REPO}"
 git fetch origin
 git reset --hard origin/main
 echo "Repo HEAD: $(git rev-parse --short HEAD)"
+if [[ ! -f "${TRAINING_SCRIPT}" ]]; then
+    echo "[fatal] Training script not found: ${TRAINING_SCRIPT}"
+    exit 1
+fi
+echo "Training script HEAD copy: ${TRAINING_SCRIPT}"
 # ---------------------------------------------------------------------------
 # 6. Run benchmark
 # ---------------------------------------------------------------------------
@@ -114,6 +116,7 @@ python "${TRAINING_SCRIPT}" \
     --eval_interval 50000           \
     --eval_episodes 3               \
     --max_envs      3               \
+    --work_dir      "${FASTMAGIC_WORK_DIR}" \
     --compile_mode  reduce-overhead
 
 # Useful flags:

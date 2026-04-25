@@ -49,6 +49,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--figures-dir", type=Path, default=Path("figures"))
     parser.add_argument("--improved-label", type=str, default="amp+compile")
+    parser.add_argument("--ablation-control-label", type=str, default="default_control")
     return parser.parse_args()
 
 
@@ -58,9 +59,9 @@ def load_csv(path: Path) -> pd.DataFrame:
     return pd.read_csv(path)
 
 
-def make_variant_label(ablation_type: str, ablation_value: str, improved_label: str) -> str:
+def make_variant_label(ablation_type: str, ablation_value: str, default_control_label: str) -> str:
     if ablation_type == "default":
-        return improved_label
+        return default_control_label
     if ablation_type == "tau":
         return f"tau={ablation_value}"
     if ablation_type == "beta":
@@ -68,6 +69,32 @@ def make_variant_label(ablation_type: str, ablation_value: str, improved_label: 
     if ablation_type == "n_hidden_layers":
         return f"layers={ablation_value}"
     return f"{ablation_type}={ablation_value}"
+
+
+def ordered_ablation_columns(variants: pd.Series, default_control_label: str) -> list[str]:
+    present = set(variants.astype(str).tolist())
+    ordered: list[str] = []
+
+    if default_control_label in present:
+        ordered.append(default_control_label)
+
+    def sort_values(prefix: str) -> list[str]:
+        subset = [variant for variant in present if variant.startswith(prefix)]
+        return sorted(subset, key=lambda value: float(value.split("=", maxsplit=1)[1]))
+
+    ordered.extend(sort_values("tau="))
+    ordered.extend(sort_values("beta="))
+    ordered.extend(sort_values("layers="))
+    ordered.extend(sorted(present - set(ordered)))
+    return ordered
+
+
+def drop_control_equivalent_variants(columns: list[str], default_control_label: str) -> list[str]:
+    if default_control_label not in columns:
+        return columns
+
+    control_equivalents = {"tau=0.7", "beta=3.0", "layers=2"}
+    return [column for column in columns if column == default_control_label or column not in control_equivalents]
 
 
 def parse_run_dir_name(name: str) -> tuple[str, int, str, str]:
@@ -118,10 +145,10 @@ def env_order_from_aggregates(baseline_agg: pd.DataFrame) -> list[str]:
     return list(baseline_agg["env"].tolist())
 
 
-def build_best_ablation_table(ablation_agg: pd.DataFrame, improved_label: str) -> pd.DataFrame:
+def build_best_ablation_table(ablation_agg: pd.DataFrame, default_control_label: str) -> pd.DataFrame:
     df = ablation_agg.copy()
     df["variant"] = df.apply(
-        lambda row: make_variant_label(str(row["ablation_type"]), str(row["ablation_value"]), improved_label),
+        lambda row: make_variant_label(str(row["ablation_type"]), str(row["ablation_value"]), default_control_label),
         axis=1,
     )
     best = df.sort_values(["env", "final_score_mean"], ascending=[True, False]).groupby("env", as_index=False).first()
@@ -309,15 +336,15 @@ def plot_systems_metrics(
     plt.close(fig)
 
 
-def plot_ablation_heatmap(ablation_agg: pd.DataFrame, improved_label: str, figures_dir: Path) -> None:
+def plot_ablation_heatmap(ablation_agg: pd.DataFrame, default_control_label: str, figures_dir: Path) -> None:
     df = ablation_agg.copy()
     df["variant"] = df.apply(
-        lambda row: make_variant_label(str(row["ablation_type"]), str(row["ablation_value"]), improved_label),
+        lambda row: make_variant_label(str(row["ablation_type"]), str(row["ablation_value"]), default_control_label),
         axis=1,
     )
 
-    column_order = [improved_label, "tau=0.9", "beta=3.0", "beta=10.0", "layers=1", "layers=2"]
-    existing_columns = [col for col in column_order if col in set(df["variant"])]
+    existing_columns = ordered_ablation_columns(df["variant"], default_control_label)
+    existing_columns = drop_control_equivalent_variants(existing_columns, default_control_label)
 
     means = df.pivot(index="env", columns="variant", values="final_score_mean")
     stds = df.pivot(index="env", columns="variant", values="final_score_std")
@@ -486,14 +513,14 @@ def generate_figures(args: argparse.Namespace) -> list[Path]:
     baseline_raw = load_csv(args.baseline_raw)
     improved_raw = load_csv(args.improved_raw)
     eval_histories = collect_eval_histories(args.results_root, args.improved_label)
-    best_ablation = build_best_ablation_table(ablation_agg, args.improved_label)
+    best_ablation = build_best_ablation_table(ablation_agg, args.ablation_control_label)
 
     args.figures_dir.mkdir(parents=True, exist_ok=True)
 
     plot_learning_curves(eval_histories, baseline_agg, args.improved_label, args.figures_dir)
     plot_score_comparison(baseline_agg, improved_agg, best_ablation, args.improved_label, args.figures_dir)
     plot_systems_metrics(baseline_agg, improved_agg, args.improved_label, args.figures_dir)
-    plot_ablation_heatmap(ablation_agg, args.improved_label, args.figures_dir)
+    plot_ablation_heatmap(ablation_agg, args.ablation_control_label, args.figures_dir)
     plot_stability_analysis(eval_histories, baseline_raw, improved_raw, args.improved_label, args.figures_dir)
     plot_summary_table(baseline_agg, improved_agg, best_ablation, args.figures_dir)
 

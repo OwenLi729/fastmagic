@@ -1,7 +1,5 @@
 <!-- AI-assisted: Claude, 2026-04-21 -->
 
-## Project Title
-
 # Fastmagic: Speeding Up Implicit Q-Learning (IQL)
 
 ## Project Overview
@@ -95,7 +93,7 @@ python src/benchmark_iql.py --preset mujoco --max_envs 3 --seeds 0 1 --train_ste
 
 The implementation follows the standard IQL decomposition into:
 
-- a value network trained with expectile regression,
+- a value network trained with **vectorized expectile regression** (no Python loops in the loss path),
 - twin Q-functions trained with Bellman backup targets, and
 - a policy trained with advantage-weighted behavior cloning.
 
@@ -103,6 +101,7 @@ The implementation follows the standard IQL decomposition into:
 
 - **GPU-resident replay buffer:** reduces repeated host-to-device transfer overhead during sampling.
 - **Mixed precision:** reduces update cost on CUDA hardware while preserving the same training objective.
+- **Vectorized expectile loss:** keeps the value-loss computation in pure tensor operations to reduce Python overhead in the update path.
 - **`torch.compile`:** targets lower Python overhead and faster repeated forward passes.
 - **Parallel V/Q updates:** explores whether the value and critic steps can be batched more efficiently without changing the benchmark task itself.
 
@@ -112,6 +111,10 @@ The committed ablations vary at least two independent design choices supported b
 
 - **architecture:** value-network depth (`n_hidden_layers`)
 - **algorithm behavior:** `tau` and `beta`
+
+For the reported MuJoCo ablation sweep, each non-default row changes one target factor while keeping the other ablation factors fixed to the default control (`tau=0.7`, `beta=3.0`, `n_hidden_layers=2`).
+
+Systems settings were also held constant across these ablation runs (mixed precision enabled, `torch.compile` enabled in `reduce-overhead` mode, parallel V/Q updates enabled, replay on GPU), so the heatmap isolates ablation-factor effects rather than re-ablating AMP/compile.
 
 This supports a rubric-aligned ablation study without overstating the scope of the completed sweep.
 
@@ -180,7 +183,7 @@ Best available ablations from the results:
 
 ![Heatmap table showing final normalized score plus standard deviation for the completed tau, beta, and layer-depth ablations.](figures/04_ablation_heatmap.png)
 
-*Figure 4. Ablation heatmap over the completed depth and hyperparameter variations currently committed to the repository.*
+*Figure 4. Ablation heatmap over distinct depth and hyperparameter variations currently committed to the repository; `default_control` is the non-ablated reference configuration, and control-equivalent variants (`beta=3.0`, `layers=2`) are omitted for readability.*
 
 #### Stability and failure-case analysis
 

@@ -71,22 +71,3 @@ def save_checkpoint(
         json.dump(config, handle, indent=2, sort_keys=True)
 
 
-def load_checkpoint(
-    checkpoint_path: str | Path,
-    models: dict[str, nn.Module],
-    optimizers: dict[str, torch.optim.Optimizer] | None = None,
-    map_location: str | torch.device = "cpu",
-) -> int:
-    """Load checkpoint state into models/optimizers and return restored step."""
-    checkpoint_path = Path(checkpoint_path)
-    payload = torch.load(checkpoint_path, map_location=map_location)
-
-    for name, model in models.items():
-        model.load_state_dict(payload["models"][name])
-
-    if optimizers is not None:
-        for name, optimizer in optimizers.items():
-            if name in payload["optimizers"]:
-                optimizer.load_state_dict(payload["optimizers"][name])
-
-    return int(payload.get("step", 0))

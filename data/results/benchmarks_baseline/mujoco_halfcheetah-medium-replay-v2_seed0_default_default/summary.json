@@ -1,0 +1,22 @@
+{
+  "avg_actor_ms": 1.1979152804360786,
+  "avg_critic_actor_update_ratio": 2.822304443283259,
+  "avg_critic_ms": 3.36712267390728,
+  "avg_inference_time_ms": 0.29445885627726714,
+  "avg_replay_buffer_throughput": 1413002.2457479204,
+  "avg_wall_clock_per_update_ms": 4.896632836707433,
+  "best_d4rl_normalized_score": 44.787175415820734,
+  "beta": 3.0,
+  "compile_backend": null,
+  "compile_mode": "default",
+  "env": "halfcheetah-medium-replay-v2",
+  "final_d4rl_normalized_score": 44.71521585531065,
+  "last_eval_step": 300000,
+  "n_hidden_layers": 2,
+  "num_evaluations": 6,
+  "parallel_vq_updates": false,
+  "run_name": "mujoco_halfcheetah-medium-replay-v2_seed0_default_default",
+  "seed": 0,
+  "tau": 0.7,
+  "torch_compile": false
+}

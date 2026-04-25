@@ -1,0 +1,9 @@
+[benchmark] skipping existing ablation=default value=default env=halfcheetah-medium-v2 seed=0
+[benchmark] skipping existing ablation=default value=default env=halfcheetah-medium-v2 seed=1
+[benchmark] skipping existing ablation=default value=default env=halfcheetah-medium-replay-v2 seed=0
+[benchmark] skipping existing ablation=default value=default env=halfcheetah-medium-replay-v2 seed=1
+[benchmark] skipping existing ablation=default value=default env=halfcheetah-medium-expert-v2 seed=0
+[benchmark] skipping existing ablation=default value=default env=halfcheetah-medium-expert-v2 seed=1
+[benchmark] wrote raw runs to results/benchmarks_baseline/mujoco_raw_runs.csv
+[benchmark] wrote aggregate results to results/benchmarks_baseline/mujoco_aggregate.csv
+[benchmark] skipped 6 existing run(s)

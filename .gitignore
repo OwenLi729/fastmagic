@@ -1,4 +1,14 @@
+#Context for Agents (rubric + instructions)
 agents.md
 context/
+
+#Virtual environment & cache
 .venv/
 __pycache__/
+
+#Generated model checkpoints (large artifacts)
+models/**/iql_step_*.pt
+models/**/*.pt
+
+#MacOS metadata
+.DS_Store

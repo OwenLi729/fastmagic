@@ -2,11 +2,15 @@
 
 # Fastmagic Setup Guide
 
-## Local Development (macOS M2)
+## Recommended Python Version
+
+Use **Python 3.10** for the most reliable PyTorch + Gym + D4RL setup. The current repository-local `.venv` in this workspace is Python 3.14 and is suitable for plotting/documentation utilities, but not for validating the full training stack.
+
+## Local Development (macOS / Linux)
 
 1. Create a Python environment (recommended 3.10):
    ```bash
-   python3 -m venv .venv
+   python3.10 -m venv .venv
    source .venv/bin/activate
    ```
 2. Install dependencies:
@@ -20,22 +24,22 @@
    ```
 4. Run a quick training sanity check (CPU/GPU depending on machine):
    ```bash
-   python src/train.py --env hopper-medium-v2 --train_steps 1000 --log_interval 100 --profile
+   python src/train.py --env halfcheetah-medium-v2 --train_steps 1000 --eval_interval 500 --log_interval 100 --profile
+   ```
+5. Generate figures from committed benchmark outputs:
+   ```bash
+   python src/generate_visualizations.py --results-root data/results --figures-dir figures
    ```
 
-## Google Colab (Primary Training Environment)
+## Benchmark / Cluster Workflow
 
-1. Open [notebooks/colab_train.ipynb](notebooks/colab_train.ipynb).
-2. Select **Runtime → Change runtime type → T4 GPU**.
-3. Run cells in order:
-   - Install packages (`!pip install ...`)
-   - Mount Google Drive
-   - Clone/open repository
-   - Choose replication preset (`mujoco` or `antmaze`), seeds, and environment subset
-   - Cache all selected D4RL datasets
-   - Launch the benchmark sweep
-   - Inspect aggregate CSV results
-   - Copy checkpoints/results to Drive
+The repository includes [notebooks/training_script.py](notebooks/training_script.py), a benchmark automation helper for longer multi-run jobs (for example, DCC / SLURM workflows). It orchestrates:
+
+- dataset caching,
+- baseline benchmark runs,
+- improved benchmark runs,
+- ablation runs, and
+- artifact copying.
 
 ## Rigorous Paper Replication Workflow
 
@@ -51,8 +55,8 @@ The notebook now supports paper-style replication with:
 You can also run the benchmark script directly:
 
 ```bash
-python src/benchmark_iql.py --preset mujoco --seeds 0 1 2 --mixed_precision
-python src/benchmark_iql.py --preset antmaze --seeds 0 1 2 --mixed_precision
+python src/benchmark_iql.py --preset mujoco --seeds 0 1 2 --mixed_precision --results_root data/results/benchmarks --checkpoint_root models/benchmarks
+python src/benchmark_iql.py --preset antmaze --seeds 0 1 2 --mixed_precision --results_root data/results/benchmarks --checkpoint_root models/benchmarks
 ```
 
 ### Baseline vs Improved on T4 (for rubric comparison)
@@ -72,15 +76,15 @@ python src/train.py --env hopper-medium-v2 --seed 0 --train_steps 100000 --profi
 For multi-seed sweeps:
 
 ```bash
-python src/benchmark_iql.py --preset mujoco --seeds 0 1 2 --baseline --replay_device cpu --profile
-python src/benchmark_iql.py --preset mujoco --seeds 0 1 2 --mixed_precision --replay_device gpu --profile
+python src/benchmark_iql.py --preset mujoco --seeds 0 1 2 --baseline --replay_device cpu --profile --results_root data/results/benchmarks_baseline --checkpoint_root models/benchmarks_baseline
+python src/benchmark_iql.py --preset mujoco --seeds 0 1 2 --mixed_precision --replay_device gpu --profile --results_root data/results/benchmarks_improved --checkpoint_root models/benchmarks_improved
 ```
 
-This produces directly comparable outputs in `results/` for wall-clock and score deltas.
+This produces directly comparable outputs in `data/results/` for wall-clock and score deltas.
 
 Outputs are saved under:
 
-- `results/benchmarks/`
+- `data/results/`
 - `models/benchmarks/`
 
 ## Key Training Flags
@@ -97,4 +101,5 @@ Outputs are saved under:
 
 - No compiled CUDA extensions are required.
 - Checkpoints and config JSON files are saved under `models/` by default.
+- Benchmark results are saved under `data/results/` by default.
 - Use `context/final_project_handout.html` for grading/rubric checks before final runs.

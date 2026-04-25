@@ -191,7 +191,7 @@ def run_baseline(args, env_py: str, repo_root: Path, bench_env: dict):
         "--preset",          args.preset,
         "--seeds",           *[str(s) for s in args.seeds],
         "--train_steps",     str(args.train_steps),
-        "--results_root",    "results/benchmarks_baseline",
+        "--results_root",    "data/results/benchmarks_baseline",
         "--checkpoint_root", "models/benchmarks_baseline",
         "--baseline",
         "--replay_device",   "cpu",
@@ -203,7 +203,7 @@ def run_baseline(args, env_py: str, repo_root: Path, bench_env: dict):
     if not args.no_profile:
         cmd.append("--profile")
 
-    log = repo_root / "results" / "benchmarks_baseline" / "run.log"
+    log = repo_root / "data" / "results" / "benchmarks_baseline" / "run.log"
     run_subprocess(cmd, log, bench_env, repo_root, "Baseline (standard IQL)")
 
 
@@ -214,7 +214,7 @@ def run_improved(args, env_py: str, repo_root: Path, bench_env: dict):
         "--preset",          args.preset,
         "--seeds",           *[str(s) for s in args.seeds],
         "--train_steps",     str(args.train_steps),
-        "--results_root",    "results/benchmarks_improved",
+        "--results_root",    "data/results/benchmarks_improved",
         "--checkpoint_root", "models/benchmarks_improved",
         "--mixed_precision",
         "--replay_device",   "gpu",
@@ -229,7 +229,7 @@ def run_improved(args, env_py: str, repo_root: Path, bench_env: dict):
     if not args.no_parallel_vq:
         cmd.append("--parallel_vq_updates")
 
-    log = repo_root / "results" / "benchmarks_improved" / "run.log"
+    log = repo_root / "data" / "results" / "benchmarks_improved" / "run.log"
     run_subprocess(cmd, log, bench_env, repo_root, "Improved (mixed prec + GPU replay + compile)")
 
 
@@ -246,7 +246,7 @@ def run_ablations(args, env_py: str, repo_root: Path, bench_env: dict):
         "--preset",               args.preset,
         "--seeds",                *[str(s) for s in args.seeds],
         "--train_steps",          str(args.train_steps),
-        "--results_root",         "results/benchmarks_ablations",
+        "--results_root",         "data/results/benchmarks_ablations",
         "--checkpoint_root",      "models/benchmarks_ablations",
         "--mixed_precision",
         "--replay_device",        "gpu",
@@ -264,7 +264,7 @@ def run_ablations(args, env_py: str, repo_root: Path, bench_env: dict):
     if not args.no_parallel_vq:
         cmd.append("--parallel_vq_updates")
 
-    log = repo_root / "results" / "benchmarks_ablations" / "run.log"
+    log = repo_root / "data" / "results" / "benchmarks_ablations" / "run.log"
     run_subprocess(cmd, log, bench_env, repo_root,
                    "Ablations (depth ∈ {1,2} × beta ∈ {3.0,10.0}, tau=0.9 fixed)")
 
@@ -273,8 +273,8 @@ def aggregate_results(args, repo_root: Path, output_dir: Path):
     """Merge baseline/improved CSVs and print comparison. Replaces display()."""
     import pandas as pd
 
-    baseline_agg = repo_root / "results" / "benchmarks_baseline" / f"{args.preset}_aggregate.csv"
-    improved_agg = repo_root / "results" / "benchmarks_improved" / f"{args.preset}_aggregate.csv"
+    baseline_agg = repo_root / "data" / "results" / "benchmarks_baseline" / f"{args.preset}_aggregate.csv"
+    improved_agg = repo_root / "data" / "results" / "benchmarks_improved" / f"{args.preset}_aggregate.csv"
 
     if not baseline_agg.exists() or not improved_agg.exists():
         print("WARNING: aggregate CSVs missing — skipping comparison (did benchmark_iql.py produce them?)")
@@ -296,9 +296,6 @@ def aggregate_results(args, repo_root: Path, output_dir: Path):
     idf = pd.read_csv(improved_agg).rename(columns=rename_impr)
 
     for df in (bdf, idf):
-        df.setdefault("ablation_type",  "default")
-        df.setdefault("ablation_value", "default")
-        # pandas ≥2.0: use loc to avoid SettingWithCopyWarning
         if "ablation_type" not in df.columns:
             df["ablation_type"] = "default"
         if "ablation_value" not in df.columns:
@@ -320,7 +317,7 @@ def aggregate_results(args, repo_root: Path, output_dir: Path):
     print(sorted_cdf.to_string())
 
     # Ablation results
-    abl_agg = repo_root / "results" / "benchmarks_ablations" / f"{args.preset}_aggregate.csv"
+    abl_agg = repo_root / "data" / "results" / "benchmarks_ablations" / f"{args.preset}_aggregate.csv"
     if abl_agg.exists():
         adf = pd.read_csv(abl_agg)
         keep = [c for c in [
@@ -343,9 +340,9 @@ def copy_artifacts(repo_root: Path, output_dir: Path):
     """Copy results + model checkpoints to output_dir (replaces Google Drive)."""
     print("\nCopying artifacts to output dir...")
     for rel in [
-        "results/benchmarks_baseline",
-        "results/benchmarks_improved",
-        "results/benchmarks_ablations",
+        "data/results/benchmarks_baseline",
+        "data/results/benchmarks_improved",
+        "data/results/benchmarks_ablations",
         "models/benchmarks_baseline",
         "models/benchmarks_improved",
         "models/benchmarks_ablations",

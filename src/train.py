@@ -78,7 +78,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--log_interval", type=int, default=1_000)
     parser.add_argument("--checkpoint_interval", type=int, default=50_000)
     parser.add_argument("--checkpoint_dir", type=str, default="models")
-    parser.add_argument("--results_dir", type=str, default="results")
+    parser.add_argument("--results_dir", type=str, default="data/results")
     parser.add_argument("--run_name", type=str, default=None)
     parser.add_argument(
         "--baseline",

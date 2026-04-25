@@ -49,7 +49,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--hidden_dim", type=int, default=256)
     parser.add_argument("--n_hidden_layers", type=int, default=2)
     parser.add_argument("--checkpoint_root", type=str, default="models/benchmarks")
-    parser.add_argument("--results_root", type=str, default="results/benchmarks")
+    parser.add_argument("--results_root", type=str, default="data/results/benchmarks")
     parser.add_argument("--baseline", action="store_true")
     parser.add_argument("--replay_device", type=str, choices=("auto", "cpu", "gpu"), default="auto")
     parser.add_argument("--mixed_precision", action="store_true")

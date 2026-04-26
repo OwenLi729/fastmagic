@@ -4,13 +4,14 @@
 
 **Fastmagic** is a PyTorch reimplementation of Implicit Q-Learning (IQL) for offline reinforcement learning on D4RL MuJoCo benchmarks for COMPSCI 372, taught by Dr. Brandon Fain. All experiments performed on an H200 GPU. Note that the GPUs are not mine and so I had very limited access to any sort of compute throughout this project, which is why I was unable to fully replicate/improve upon all of the results of the paper. 
 
-The central project goal is: **can a faithful IQL reimplementation remain competitive while improving training efficiency through systems-level optimizations such as mixed precision, GPU-resident replay, vectorized expectile loss, `torch.compile`, and parallel V/Q updates?**
+The central project goal is: 
+**can a faithful IQL reimplementation remain competitive while improving training efficiency through systems optimizations such as mixed precision, GPU-resident replay, vectorized expectile loss, `torch.compile`, and parallel V/Q updates?**
 
 This repository focuses on three linked outcomes:
 
 1. reproduce a working IQL baseline,
 2. measure efficiency gains from implementation changes, and
-3. study how architectural and algorithmic choices affect normalized D4RL score.
+3. study how architectural and algorithmic choices affect normalized D4RL score (ablation study).
 
 ## Repository Structure
 
@@ -19,7 +20,6 @@ This repository focuses on three linked outcomes:
 - `models/` — saved checkpoints and benchmark model artifacts
 - `figures/` — generated plots for slides and README
 - `notebooks/` — benchmark automation helper script and cluster submission file
-- `context/` — rubric handout and supporting course materials
 - `videos/` — intended location for demo and walkthrough assets
 - `SETUP.md` — detailed setup instructions
 - `ATTRIBUTION.md` — AI and external resource attribution log
@@ -114,15 +114,13 @@ For the reported MuJoCo ablation sweep, each non-default row changes one target 
 
 Systems settings were also held constant across these ablation runs (mixed precision enabled, `torch.compile` enabled in `reduce-overhead` mode, parallel V/Q updates enabled, replay on GPU), so the heatmap isolates ablation-factor effects rather than re-ablating AMP/compile.
 
-This supports a rubric-aligned ablation study without overstating the scope of the completed sweep.
-
 ## Evaluation
 
 All quantitative values below come directly from the committed benchmark outputs in `data/results/`.
 
 ### Metrics
 
-The evaluation metrics are aligned to the project goal of maintaining or improving offline RL performance while reducing training cost:
+Evaluation metrics:
 
 - final D4RL normalized score
 - best D4RL normalized score during training
@@ -150,8 +148,6 @@ The table below compares our **baseline** IQL implementation against the numbers
 | halfcheetah-medium-expert-v2 | 86.7 ± 5.7 | 53.98 ± 22.66 | 62.3%† |
 
 † Medium-expert is a well-known high-variance environment; the paper itself reports ±5.7 over 10 seeds, and the multi-modal reward structure makes 2-seed estimates unreliable.  Our best ablation (`β=10.0`) reaches **87.31 ± 4.47** on medium-expert, exceeding the paper's reported mean.
-
-**Conclusion:** medium and medium-replay scores are reproduced to within 2.4% of the published values, directly validated against the primary reference codebase.
 
 #### Improved Performance over Baseline
 
@@ -185,7 +181,7 @@ Best available ablations from the results:
 
 ![Learning curves comparing baseline and improved IQL across the three committed HalfCheetah tasks.](figures/01_learning_curves.png)
 
-*Figure 1. Baseline vs improved learning curves using the committed `eval_history.csv` files. This figure supports the convergence / reward-curve rubric evidence.*
+*Figure 1. Baseline vs improved learning curves using the committed `eval_history.csv` files.*
 
 #### Final and best-score comparison
 
@@ -211,14 +207,6 @@ Best available ablations from the results:
 
 *Figure 5. Compact summary of score changes and systems speedups for presentation use.*
 
-### Rubric Alignment
-
-- **Convergence via learning curves:** supported by Figure 1 and the per-run `eval_history.csv` files.
-- **Inference time / throughput reporting:** supported by Figure 3 and the aggregate timing metrics.
-- **Ablation study over multiple independent choices:** supported by Figure 4 using depth plus `tau`/`beta` changes.
-- **Quantitative comparison of approaches:** supported by Figure 2 and the score table.
-(NOT SURE IF RUBRIC ALIGNMENT SECTION NEEDED, CHECK RUBRIC ^)
-
 ### Current Scope
 
 The committed benchmark snapshot currently covers three HalfCheetah environments:
@@ -227,7 +215,7 @@ The committed benchmark snapshot currently covers three HalfCheetah environments
 - `halfcheetah-medium-replay-v2`
 - `halfcheetah-medium-expert-v2`
 
-The repository does not currently include a full sweep over all planned `tau` / `beta` values or uploaded final video links due to compute constraints.
+The repository does not currently include a full sweep over more `tau` / `beta` values due to compute constraints.
 
 ## Attribution Note
 

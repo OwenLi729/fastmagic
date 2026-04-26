@@ -1,3 +1,4 @@
+<!-- AI-assisted: Claude, 2026-04-21 -->
 # Fastmagic: Speeding Up Implicit Q-Learning (IQL)
 
 ## What it Does
@@ -228,4 +229,3 @@ https://github.com/rail-berkeley/rlkit/
 
 - Owen Li
 
-<!-- AI-assisted: Claude, 2026-04-21 -->

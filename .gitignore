@@ -1,6 +1,7 @@
 #Context for Agents (rubric + instructions)
 agents.md
 context/
+rubric.md
 
 #Virtual environment & cache
 .venv/

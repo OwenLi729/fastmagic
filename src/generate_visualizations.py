@@ -37,16 +37,6 @@ def parse_args() -> argparse.Namespace:
         type=Path,
         default=Path("data/results/benchmarks_ablations/mujoco_aggregate.csv"),
     )
-    parser.add_argument(
-        "--baseline-raw",
-        type=Path,
-        default=Path("data/results/benchmarks_baseline/mujoco_raw_runs.csv"),
-    )
-    parser.add_argument(
-        "--improved-raw",
-        type=Path,
-        default=Path("data/results/benchmarks_improved/mujoco_raw_runs.csv"),
-    )
     parser.add_argument("--figures-dir", type=Path, default=Path("figures"))
     parser.add_argument("--improved-label", type=str, default="amp+compile")
     parser.add_argument("--ablation-control-label", type=str, default="default_control")
@@ -374,100 +364,6 @@ def plot_ablation_heatmap(ablation_agg: pd.DataFrame, default_control_label: str
     plt.close(fig)
 
 
-def pick_failure_case_env(baseline_raw: pd.DataFrame, improved_raw: pd.DataFrame, improved_label: str) -> str:
-    raw = pd.concat(
-        [
-            baseline_raw.assign(variant="baseline"),
-            improved_raw.assign(variant=improved_label),
-        ],
-        ignore_index=True,
-    )
-    raw["peak_to_final_drop"] = raw["best_d4rl_normalized_score"] - raw["final_d4rl_normalized_score"]
-    worst = raw.groupby("env", as_index=False)["peak_to_final_drop"].mean().sort_values("peak_to_final_drop", ascending=False)
-    return str(worst.iloc[0]["env"])
-
-
-def plot_stability_analysis(
-    eval_histories: pd.DataFrame,
-    baseline_raw: pd.DataFrame,
-    improved_raw: pd.DataFrame,
-    improved_label: str,
-    figures_dir: Path,
-) -> None:
-    combined_raw = pd.concat(
-        [
-            baseline_raw.assign(variant="baseline"),
-            improved_raw.assign(variant=improved_label),
-        ],
-        ignore_index=True,
-    )
-    combined_raw["peak_to_final_drop"] = combined_raw["best_d4rl_normalized_score"] - combined_raw["final_d4rl_normalized_score"]
-
-    focus_env = pick_failure_case_env(baseline_raw, improved_raw, improved_label)
-    focus_histories = eval_histories[
-        (eval_histories["env"] == focus_env) & (eval_histories["variant"].isin(["baseline", improved_label]))
-    ].copy()
-
-    fig, axes = plt.subplots(1, 2, figsize=(15, 5.5))
-
-    sns.barplot(
-        data=combined_raw,
-        x="env",
-        y="peak_to_final_drop",
-        hue="variant",
-        errorbar=None,
-        palette={"baseline": PALETTE["baseline"], improved_label: PALETTE[improved_label]},
-        ax=axes[0],
-    )
-    sns.stripplot(
-        data=combined_raw,
-        x="env",
-        y="peak_to_final_drop",
-        hue="variant",
-        dodge=True,
-        marker="o",
-        size=5,
-        linewidth=0,
-        palette={"baseline": PALETTE["baseline"], improved_label: PALETTE[improved_label]},
-        ax=axes[0],
-    )
-    axes[0].set_title("Training Stability: Peak-to-Final Drop")
-    axes[0].set_xlabel("Environment")
-    axes[0].set_ylabel("Best score - final score")
-    axes[0].tick_params(axis="x", rotation=20)
-    axes[0].grid(axis="y", alpha=0.25)
-
-    for variant in ["baseline", improved_label]:
-        var_df = focus_histories[focus_histories["variant"] == variant]
-        for seed, seed_df in var_df.groupby("seed"):
-            axes[1].plot(
-                seed_df["step"],
-                seed_df["normalized_score"],
-                marker="o",
-                linewidth=2,
-                label=f"{variant} seed={seed}",
-                color=PALETTE[variant],
-                alpha=0.6 if seed else 1.0,
-            )
-
-    axes[1].set_title(f"Failure-Case Learning Curves: {focus_env}")
-    axes[1].set_xlabel("Training steps")
-    axes[1].set_ylabel("D4RL normalized score")
-    axes[1].grid(alpha=0.25)
-
-    handles0, labels0 = axes[0].get_legend_handles_labels()
-    dedup0 = dict(zip(labels0, handles0))
-    axes[0].legend(dedup0.values(), dedup0.keys(), frameon=False)
-
-    handles1, labels1 = axes[1].get_legend_handles_labels()
-    dedup1 = dict(zip(labels1, handles1))
-    axes[1].legend(dedup1.values(), dedup1.keys(), frameon=False, fontsize=8)
-
-    fig.tight_layout()
-    fig.savefig(figures_dir / "05_stability_analysis.png", dpi=300, bbox_inches="tight")
-    plt.close(fig)
-
-
 def plot_summary_table(
     baseline_agg: pd.DataFrame,
     improved_agg: pd.DataFrame,
@@ -502,7 +398,7 @@ def plot_summary_table(
     table.scale(1.0, 1.45)
     ax.set_title("Metric Summary for Slides / README", pad=14)
     fig.tight_layout()
-    fig.savefig(figures_dir / "06_summary_table.png", dpi=300, bbox_inches="tight")
+    fig.savefig(figures_dir / "05_summary_table.png", dpi=300, bbox_inches="tight")
     plt.close(fig)
 
 
@@ -510,8 +406,6 @@ def generate_figures(args: argparse.Namespace) -> list[Path]:
     baseline_agg = load_csv(args.baseline_aggregate)
     improved_agg = load_csv(args.improved_aggregate)
     ablation_agg = load_csv(args.ablation_aggregate)
-    baseline_raw = load_csv(args.baseline_raw)
-    improved_raw = load_csv(args.improved_raw)
     eval_histories = collect_eval_histories(args.results_root, args.improved_label)
     best_ablation = build_best_ablation_table(ablation_agg, args.ablation_control_label)
 
@@ -521,7 +415,6 @@ def generate_figures(args: argparse.Namespace) -> list[Path]:
     plot_score_comparison(baseline_agg, improved_agg, best_ablation, args.improved_label, args.figures_dir)
     plot_systems_metrics(baseline_agg, improved_agg, args.improved_label, args.figures_dir)
     plot_ablation_heatmap(ablation_agg, args.ablation_control_label, args.figures_dir)
-    plot_stability_analysis(eval_histories, baseline_raw, improved_raw, args.improved_label, args.figures_dir)
     plot_summary_table(baseline_agg, improved_agg, best_ablation, args.figures_dir)
 
     return [
@@ -529,8 +422,7 @@ def generate_figures(args: argparse.Namespace) -> list[Path]:
         args.figures_dir / "02_score_comparison.png",
         args.figures_dir / "03_systems_metrics.png",
         args.figures_dir / "04_ablation_heatmap.png",
-        args.figures_dir / "05_stability_analysis.png",
-        args.figures_dir / "06_summary_table.png",
+        args.figures_dir / "05_summary_table.png",
     ]
 
 

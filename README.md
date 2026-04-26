@@ -1,5 +1,5 @@
 <!-- AI-assisted: Claude, 2026-04-21 -->
-# Fastmagic: Speeding Up Implicit Q-Learning (IQL)
+# Fastmagic
 
 ## What it Does
 

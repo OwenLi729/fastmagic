@@ -139,15 +139,15 @@ Source files:
 
 #### Reproduction: Comparison with Kostrikov et al. (2021)
 
-The table below compares our **baseline** IQL implementation against the numbers reported in Table 1 of the original IQL paper (Kostrikov et al., 2021, "Offline Reinforcement Learning with Implicit Q-Learning", ICLR 2022).  Our reproduction used the same hyperparameters (`τ=0.7`, `β=3.0`, `γ=0.99`, `ρ=0.005`) and D4RL v2 environments.  Two seeds were run; mean ± std are shown.
+The table below compares our **baseline** IQL implementation against the numbers reported in Table 1 of the original IQL paper (Kostrikov et al., 2021, "Offline Reinforcement Learning with Implicit Q-Learning", ICLR 2022).  Our reproduction used the same hyperparameters (`τ=0.7`, `β=3.0`, `γ=0.99`, `ρ=0.005`) and D4RL v2 environments.  For paper entries, we report the table means only; our entries are mean ± std over two seeds.
 
 | Environment | Paper (Kostrikov et al.) | Ours (baseline) | % of Paper |
 |---|---:|---:|---:|
-| halfcheetah-medium-v2 | 47.4 ± 0.2 | **46.25 ± 0.46** | 97.6% |
-| halfcheetah-medium-replay-v2 | 44.2 ± 1.2 | **44.41 ± 0.30** | 100.5% |
-| halfcheetah-medium-expert-v2 | 86.7 ± 5.7 | 53.98 ± 22.66 | 62.3%† |
+| halfcheetah-medium-v2 | 47.4 | **46.25 ± 0.46** | 97.6% |
+| halfcheetah-medium-replay-v2 | 44.2 | **44.41 ± 0.30** | 100.5% |
+| halfcheetah-medium-expert-v2 | 86.7 | 53.98 ± 22.66 | 62.3%† |
 
-† Medium-expert is a well-known high-variance environment; the paper itself reports ±5.7 over 10 seeds, and the multi-modal reward structure makes 2-seed estimates unreliable.  Our best ablation (`β=10.0`) reaches **87.31 ± 4.47** on medium-expert, exceeding the paper's reported mean.
+† With only 2 seeds, estimates are unreliable; our best ablation (β=10.0) reaches **87.31 ± 4.47**, exceeding the paper's reported mean.
 
 #### Improved Performance over Baseline
 
@@ -201,7 +201,7 @@ Best available ablations from the results:
 
 *Figure 4. Ablation heatmap over distinct depth and hyperparameter variations currently committed to the repository; `default_control` is the non-ablated reference configuration, and control-equivalent variants (`beta=3.0`, `layers=2`) are omitted for readability.*
 
-#### Slide-ready summary table
+#### Summary table
 
 ![Summary table listing baseline final score, improved final score, delta, and systems speedups for each environment.](figures/05_summary_table.png)
 

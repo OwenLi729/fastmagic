@@ -1,5 +1,3 @@
-<!-- AI-assisted: Claude, 2026-04-21 -->
-
 # Fastmagic: Speeding Up Implicit Q-Learning (IQL)
 
 ## What it Does
@@ -85,7 +83,7 @@ python src/benchmark_iql.py --preset mujoco --max_envs 3 --seeds 0 1 --train_ste
 ## Video Links
 
 - Demo video: [videos/fastmagic_demo.mp4](videos/fastmagic_demo.mp4)
-- Technical walkthrough: **add direct course-submission link here before final submission**
+- Technical walkthrough: [videos/fastmagic_walkthrough.mov](videos/fastmagic_walkthrough.mov)
 
 ## Design Decisions
 
@@ -241,3 +239,5 @@ https://github.com/rail-berkeley/rlkit/
 ## Contributors
 
 - Owen Li
+
+<!-- AI-assisted: Claude, 2026-04-21 -->

@@ -27,35 +27,10 @@ This file tracks AI-assisted and external resources used in the Fastmagic course
 - AI-assistance is also noted per-function or per-file.
 - AI-generated public functions/classes include in-file comment tags.
 
-## External Libraries
-
-- PyTorch (`torch`)
-- Gym (`gym`)
-- D4RL (`d4rl`)
-- NumPy (`numpy`)
-- tqdm (`tqdm`)
-- pandas (`pandas`)
-- matplotlib (`matplotlib`)
-- seaborn (`seaborn`)
-
-## Datasets
-
-- D4RL offline RL datasets (e.g., `hopper-medium-v2`)
-- Download script: `data/download_d4rl.py`
-
-## Notes for Course Submission
-
-- Keep this file updated as code evolves.
-- Record all AI-assisted changes before final submission.
-- Ensure AI attribution is consistent with course policy and rubric.
-
 ## AI Usage
 
-In ATTRIBUTION.md, provided a substantive account of how AI development tools were used in the project, including what was generated, what was modified, and what you had to debug, fix, or substantially rework (3 pts)
+I used AI for accelerating my productivity rather than replacing my own judgement. For the core implementation, I used AI to generate the initial scaffolding and code while referencing the RLKit PyTorch IQL implementation, produce the training script for validation purposes, and generate boilerplate files like `requirements.txt`, `ATTRIBUTION.md`, `SETUP.md`, and the README. I also leaned on AI for the GaussianPolicy class in `src/networks.py`, where I wasn't entirely sure how to implement it on my own.  
 
-I used AI heavily for initial code generation while referencing the RLKit PyTorch implementation of Implicit Q-Learning in order to be able to quickly reimplement the algorithm as a baseline. I also used it to generate the training notebook/script so I could rapidly validate my code and ensure that I could use it to reproduce the results of the paper, and to be able to quickly test any improvements I made. I leveraged AI for debugging throughout the project.
-AI was also helpful for initial scaffolding and to create the requirements.txt and quickly establish a directory structure which adhered to the rubric. While I used it to generate the ATTRIBUTION.md and README.md, I heavily augmented both for accuracy.
-I had to rework the training notework and tune the hyperparameters myself, as well as evaluate the results against the paper. I also had to debug an issue where incomplete runs were being marked as completed during training runs (with AI assistance).
-After I completed the runs and collected the training data, I used AI to help quickly parse the data, graph it, and summarize it in the Evaluations section. For the final reporting pass, I specifically used AI to verify which ablation values were actually present in the committed results, update the README with only measured CSV values, and generate reusable plotting code that refuses to fabricate missing CP-threshold or paper-reference data.
-While the idea of this project was my own, I would prompt AI on a high-level to allow it to speed up my workflows, primarily with things like code-generation, formatting, generating plots, as well as writing things like the Quickstart, SETUP.md, requirements.txt, and expanding on my ideas in the README.
-Tuned issues with the curves, primarily issues with formatting (such as legends being inside of the title) as well as redundacies in plotting the heatmap like the AI plotting beta=3.0 and layers=2 even though the default control already has beta=3.0 and layers=2. There were some things I needed the AI to implement extensively as I wasn't sure how to approach it, namely the GaussianPolicy class in `src/networks.py`
+I conducted hyperparameter tuning, result evaluation, and debugging a bug where incomplete training runs were being marked as completed, the later being with some AI assistance. I also had to rework the training script and manually verify that all reported ablation values matched committed CSV results, and correct AI-generated content in the README and `ATTRIBUTION.md` for accuracy.
+
+After collecting the data, I used AI to parse results, generate plots, and draft the Evaluations section while guiding the AI to refine the plots. This included things like formatting misplaced legends and removing redundant curves.

@@ -62,12 +62,8 @@ class GPUReplayBuffer:
 
     def _compute_dones_float(self, dataset: dict[str, np.ndarray]) -> np.ndarray:
         dones_float = np.zeros_like(dataset["rewards"], dtype=np.float32)
-        for index in range(len(dones_float) - 1):
-            observation_gap = np.linalg.norm(
-                dataset["observations"][index + 1] - dataset["next_observations"][index]
-            )
-            if observation_gap > 1e-6 or dataset["terminals"][index] == 1.0:
-                dones_float[index] = 1.0
+        obs_gaps = np.linalg.norm(dataset["observations"][1:] - dataset["next_observations"][:-1], axis=-1)                                                                                                               
+        dones_float[:-1] = ((obs_gaps > 1e-6) | (dataset["terminals"][:-1] == 1.0)).astype(np.float32)
         dones_float[-1] = 1.0
         return dones_float
 

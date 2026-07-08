@@ -152,7 +152,7 @@ The table below compares our **baseline** IQL implementation against the numbers
 
 #### Improved Performance over Baseline
 
-The table below compares the **baseline** (CPU replay, FP32, no compile) against the **improved** configuration (GPU-pinned replay, BF16 mixed precision, `torch.compile`, parallel V/Q updates).
+The table below compares the **baseline** (CPU replay, FP32, no compile) against the **improved** configuration (GPU-resident replay, BF16 mixed precision, `torch.compile`, parallel V/Q updates).
 
 | Env | Baseline Final | Improved Final | Δ Final | Baseline Best | Improved Best |
 |-----|---:|---:|---:|---:|---:|
